@@ -2,34 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Debug Dark Techno Braam</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.js"></script>
+  <title>Dark Techno Braam with Stop Button</title>
+  <script src="https://unpkg.com/tone@14.8.39/build/Tone.js"></script>
 </head>
 <body style="background:#000;color:#eee;text-align:center;padding-top:2em;">
-  <h1>Dark Techno Braam Debug</h1>
+  <h1>Dark Techno Braam with Stop</h1>
   <button id="start">Start</button>
+  <button id="stop" disabled>Stop</button>
   <p>Kick every beat, Braam every 2 bars</p>
 
 <script>
+let kick, braam, reverb;
+
 document.getElementById("start").addEventListener("click", async () => {
   await Tone.start();
 
   Tone.Transport.bpm.value = 140;
 
   // --- Kick ---
-  const kick = new Tone.MembraneSynth().toDestination();
+  kick = new Tone.MembraneSynth().toDestination();
   new Tone.Loop(time => {
     kick.triggerAttackRelease("C1", "8n", time);
   }, "4n").start(0);
 
   // --- FX chain for Braam ---
   const distortion = new Tone.Distortion(0.4);
-  const reverb = new Tone.Reverb({ decay: 6, wet: 0.6 });
-  await reverb.generate(); // IMPORTANT in v14
+  reverb = new Tone.Reverb({ decay: 6, wet: 0.6 });
+  await reverb.generate();
   distortion.chain(reverb, Tone.Destination);
 
   // --- Braam synth ---
-  const braam = new Tone.MonoSynth({
+  braam = new Tone.MonoSynth({
     oscillator: { type: "sawtooth" },
     envelope: { attack: 0.1, decay: 0.6, sustain: 0.5, release: 4 },
     filter: { type: "lowpass", frequency: 300 }
@@ -40,7 +43,23 @@ document.getElementById("start").addEventListener("click", async () => {
     braam.triggerAttackRelease("C1", "1n", time);
   }, "2m", "0:0:0");
 
+  // Start playback
   Tone.Transport.start();
+
+  // Enable Stop button
+  document.getElementById("stop").disabled = false;
+  document.getElementById("start").disabled = true;
+});
+
+document.getElementById("stop").addEventListener("click", () => {
+  Tone.Transport.stop();
+  Tone.Transport.cancel(0); // clear scheduled events
+  if (reverb) reverb.dispose();
+  if (kick) kick.dispose();
+  if (braam) braam.dispose();
+
+  document.getElementById("stop").disabled = true;
+  document.getElementById("start").disabled = false;
 });
 </script>
 </body>
