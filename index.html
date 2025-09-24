@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dark Techno Braam Effect</title>
+  <script src="https://unpkg.com/tone@14.8.39/build/Tone.js"></script>
+</head>
+<body style="background:#000;color:#eee;text-align:center;font-family:sans-serif;padding-top:2em;">
+  <h1>Dark Techno Braam Effect (Detuned Saw Stacks)</h1>
+  <button id="start">Start Track</button>
+  <p>Click to start the 140 BPM kick/rumble + synced Braam every 8 bars.</p>
+
+<script>
+document.getElementById("start").addEventListener("click", async () => {
+  await Tone.start();
+
+  // === Transport setup ===
+  Tone.Transport.bpm.value = 140;
+
+  // === Kick drum ===
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.02,
+    octaves: 6,
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.001, decay: 0.5, sustain: 0 }
+  }).toDestination();
+
+  // Rumble: kick routed to LPF + reverb
+  const rumbleReverb = new Tone.Reverb({ decay: 8, wet: 0.8 }).toDestination();
+  const rumbleFilter = new Tone.Filter({ type: "lowpass", frequency: 80 }).connect(rumbleReverb);
+  kick.connect(rumbleFilter);
+
+  // === Braam FX chain ===
+  const distortion = new Tone.Distortion({ distortion: 0.5, oversample: "4x" });
+  const braamFilter = new Tone.Filter({ type: "lowpass", frequency: 400, rolloff: -24 });
+  const braamReverb = new Tone.Reverb({ decay: 9, wet: 0.7 });
+  const braamEQ = new Tone.EQ3(-2, -4, -8); // tame highs/lows for dark vibe
+  distortion.chain(braamFilter, braamEQ, braamReverb, Tone.Destination);
+
+  // === Braam synth layers ===
+
+  // Detuned saw stack (main body)
+  const braamSaw = new Tone.PolySynth(Tone.MonoSynth, {
+    oscillator: { type: "sawtooth" },
+    filter: { type: "lowpass", frequency: 300 },
+    envelope: { attack: 0.2, decay: 0.7, sustain: 0.5, release: 6 },
+    filterEnvelope: { attack: 0.2, decay: 1, sustain: 0.3, release: 6, baseFrequency: 200, octaves: 3 }
+  }).connect(distortion);
+
+  // Detune trick: offset frequencies slightly
+  braamSaw.set({ detune: -10 });
+  const braamSaw2 = braamSaw.clone().connect(distortion);
+  braamSaw2.set({ detune: +10 });
+
+  // Brass-like square stab
+  const braamSquare = new Tone.MonoSynth({
+    oscillator: { type: "square" },
+    filter: { type: "bandpass", frequency: 500 },
+    envelope: { attack: 0.1, decay: 0.5, sustain: 0.2, release: 3 },
+    filterEnvelope: { attack: 0.2, decay: 1, sustain: 0.2, release: 3, baseFrequency: 300, octaves: 2 }
+  }).connect(distortion);
+
+  // Noise hit for texture
+  const braamNoise = new Tone.NoiseSynth({
+    noise: { type: "brown" },
+    envelope: { attack: 0.05, decay: 1.0, sustain: 0, release: 2 }
+  }).connect(distortion);
+
+  // === Patterns ===
+  // Kick: 4-on-the-floor
+  const kickLoop = new Tone.Loop(time => {
+    kick.triggerAttackRelease("C1", "8n", time);
+  }, "4n").start(0);
+
+  // Braam every 8 bars
+  Tone.Transport.scheduleRepeat(time => {
+    // Trigger layered Braam
+    braamSaw.triggerAttackRelease(["C1","C2","C3"], "1n", time, 0.9);
+    braamSaw2.triggerAttackRelease(["C1","C2","C3"], "1n", time, 0.9);
+    braamSquare.triggerAttackRelease("C2", "2n", time, 0.8);
+    braamNoise.triggerAttackRelease("1n", time);
+
+    // Pitch dive for cinematic feel
+    braamSaw.voices.forEach(v => {
+      v.oscillator.frequency.rampTo(Tone.Frequency("A0"), 1, time + 0.1);
+    });
+    braamSaw2.voices.forEach(v => {
+      v.oscillator.frequency.rampTo(Tone.Frequency("A0"), 1, time + 0.1);
+    });
+
+  }, "8m", "0:0:0"); // every 8 measures at 140 BPM
+
+  // Start
+  Tone.Transport.start();
+});
+</script>
+</body>
+</html>
